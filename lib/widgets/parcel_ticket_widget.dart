@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../../theme/app_theme.dart';
 import '../../models/parcel_model.dart';
 
@@ -25,42 +26,63 @@ class ParcelTicketWidget extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header
+          // Header (Logo & Title)
           Container(
-            padding: const EdgeInsets.all(AppTheme.spacingM),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppTheme.spacingM,
+              vertical: 12,
+            ),
             decoration: const BoxDecoration(
-              color: AppTheme.maryOrangeRed, // Cargo color
+              color: AppTheme.maryBlack,
               borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                // Logo Placeholder
+                const Icon(
+                  Icons.flight_takeoff,
+                  color: AppTheme.maryOrangeRed,
+                  size: 24,
+                ),
+                const SizedBox(width: 8),
                 const Text(
-                  'CARGO RECEIPT',
+                  'MaryAir Cargo',
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
-                    letterSpacing: 2,
+                    fontSize: 18,
                   ),
                 ),
-                Text(
-                  parcel.id,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.maryOrangeRed,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    parcel.id,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
 
-          // Content
+          // Main Content
           Padding(
             padding: const EdgeInsets.all(AppTheme.spacingM),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Photo Column
+                // Col 1: Image & Code (Flex 3)
                 Expanded(
                   flex: 3,
                   child: Column(
@@ -87,63 +109,92 @@ class ParcelTicketWidget extends StatelessWidget {
                                 color: Colors.grey,
                               ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 12),
+                      // QR Code Mock
+                      QrImageView(
+                        data: parcel.id,
+                        version: QrVersions.auto,
+                        size: 80.0,
+                        backgroundColor: Colors.white,
+                      ),
+                      const SizedBox(height: 4),
                       Text(
-                        'Goods Photo',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 10),
+                        'Scan to Track',
+                        style: TextStyle(color: Colors.grey[500], fontSize: 10),
+                        textAlign: TextAlign.center,
                       ),
                     ],
                   ),
                 ),
+
                 const SizedBox(width: AppTheme.spacingM),
 
-                // Data Column
+                // Col 2: Data (Flex 7)
                 Expanded(
                   flex: 7,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Route
+                      // Route Highlighting
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _buildCodeColumn(parcel.origin, 'Origin'),
-                          const Icon(
-                            Icons.flight_takeoff,
-                            color: AppTheme.maryOrangeRed,
-                            size: 20,
+                          Expanded(
+                            child: _buildBigCode(parcel.origin, 'Origin'),
                           ),
-                          _buildCodeColumn(parcel.destination, 'Destination'),
+                          const Icon(
+                            Icons.arrow_forward,
+                            color: Colors.grey,
+                            size: 16,
+                          ),
+                          Expanded(
+                            child: _buildBigCode(
+                              parcel.destination,
+                              'Destination',
+                            ),
+                          ),
                         ],
                       ),
-                      const Divider(height: 24),
+                      const Divider(),
 
-                      // Sender / Receiver
-                      _buildRow('Sender', parcel.senderName),
-                      const SizedBox(height: 4),
-                      _buildRow('Receiver', parcel.receiverName),
-                      const Divider(height: 24),
-
-                      // Flight & Date
+                      // Dates
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _buildField('Flight', parcel.flightNumber),
-                          _buildField(
-                            'Date',
-                            parcel.departureDate.toString().split(' ')[0],
+                          _buildDetail(
+                            'Departure',
+                            _formatDate(parcel.departureDate),
                           ),
+                          _buildDetail(
+                            'Est. Arrival',
+                            _formatDate(
+                              parcel.departureDate.add(
+                                const Duration(hours: 8),
+                              ),
+                            ),
+                          ), // Mock duration
                         ],
                       ),
                       const SizedBox(height: 12),
 
-                      // Parcel Details
+                      // Commodity Info
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _buildField('Weight', '${parcel.weightKg} kg'),
-                          _buildField('Dims', parcel.dimensions),
+                          _buildDetail('Commodity', parcel.commodityType),
+                          _buildDetail('Weight', '${parcel.weightKg} kg'),
                         ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Parties
+                      _buildRow(
+                        'Sender',
+                        '${parcel.senderName}\n${parcel.senderContact}',
+                      ),
+                      const SizedBox(height: 8),
+                      _buildRow(
+                        'Receiver',
+                        '${parcel.receiverName}\n${parcel.receiverContact}',
                       ),
 
                       const Divider(height: 24),
@@ -153,7 +204,7 @@ class ParcelTicketWidget extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text(
-                            'Total Cost',
+                            'Total Paid',
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
                           Text(
@@ -161,7 +212,7 @@ class ParcelTicketWidget extends StatelessWidget {
                             style: const TextStyle(
                               color: AppTheme.maryOrangeRed,
                               fontWeight: FontWeight.bold,
-                              fontSize: 18,
+                              fontSize: 20,
                             ),
                           ),
                         ],
@@ -173,20 +224,13 @@ class ParcelTicketWidget extends StatelessWidget {
             ),
           ),
 
-          // Footer
+          // Bottom Branding strip
           Container(
-            padding: const EdgeInsets.all(AppTheme.spacingS),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: const BorderRadius.vertical(
-                bottom: Radius.circular(16),
-              ),
-            ),
-            child: Center(
-              child: Text(
-                'MaryAir Cargo Service',
-                style: TextStyle(color: Colors.grey[500], fontSize: 10),
-              ),
+            width: double.infinity,
+            height: 4,
+            decoration: const BoxDecoration(
+              color: AppTheme.maryOrangeRed,
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
             ),
           ),
         ],
@@ -194,19 +238,28 @@ class ParcelTicketWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildCodeColumn(String code, String label) {
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
+  }
+
+  Widget _buildBigCode(String code, String label) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           code,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1,
+          ),
         ),
         Text(label, style: TextStyle(color: Colors.grey[500], fontSize: 10)),
       ],
     );
   }
 
-  Widget _buildField(String label, String value) {
+  Widget _buildDetail(String label, String value) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -221,6 +274,7 @@ class ParcelTicketWidget extends StatelessWidget {
 
   Widget _buildRow(String label, String value) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
           width: 60,
@@ -232,7 +286,7 @@ class ParcelTicketWidget extends StatelessWidget {
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 12),
           ),
         ),
       ],

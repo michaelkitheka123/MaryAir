@@ -11,6 +11,7 @@ class Parcel {
   final String description;
   final double weightKg;
   final String dimensions; // e.g., "30x20x10 cm"
+  final String commodityType; // NEW: Electronics, Clothing, etc.
   final Uint8List? photoBytes; // For the picture column
 
   final String flightNumber;
@@ -30,6 +31,7 @@ class Parcel {
     required this.description,
     required this.weightKg,
     required this.dimensions,
+    required this.commodityType,
     this.photoBytes,
     required this.flightNumber,
     required this.departureDate,
@@ -50,6 +52,7 @@ class Parcel {
       description: '',
       weightKg: 0.0,
       dimensions: '',
+      commodityType: 'Others',
       flightNumber: '',
       departureDate: DateTime.now(),
       origin: '',
@@ -67,6 +70,7 @@ class Parcel {
     String? description,
     double? weightKg,
     String? dimensions,
+    String? commodityType,
     Uint8List? photoBytes,
     String? flightNumber,
     DateTime? departureDate,
@@ -84,6 +88,7 @@ class Parcel {
       description: description ?? this.description,
       weightKg: weightKg ?? this.weightKg,
       dimensions: dimensions ?? this.dimensions,
+      commodityType: commodityType ?? this.commodityType,
       photoBytes: photoBytes ?? this.photoBytes,
       flightNumber: flightNumber ?? this.flightNumber,
       departureDate: departureDate ?? this.departureDate,
@@ -104,6 +109,7 @@ class Parcel {
       'description': description,
       'weightKg': weightKg,
       'dimensions': dimensions,
+      'commodityType': commodityType,
       // 'photoBytes': photoBytes, // Consider uploading to storage and using URL in real app
       'flightNumber': flightNumber,
       'departureDate': departureDate.toIso8601String(),

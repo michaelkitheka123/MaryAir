@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../theme/app_theme.dart';
 import '../../models/parcel_model.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/parcel_ticket_widget.dart';
 import '../../widgets/dashed_container.dart';
+import '../../data/airports_data.dart'; // Import airport data
 
 class ParcelWizardScreen extends StatefulWidget {
   const ParcelWizardScreen({super.key});
@@ -30,9 +32,27 @@ class _ParcelWizardScreenState extends State<ParcelWizardScreen> {
 
   // State
   Uint8List? _parcelPhoto;
-  String? _selectedFlight;
+  String _commodityType = 'Others'; // Default
+
+  // Route State
+  String? _originCountry;
+  String? _originAirportCode;
+  String? _destCountry;
+  String? _destAirportCode;
+
+  String? _selectedFlight; // Optional/Preferred flight
   DateTime _flightDate = DateTime.now().add(const Duration(days: 1));
   double _calculatedCost = 0.0;
+
+  // Commodity Options
+  final List<String> _commodityTypes = [
+    'General Goods',
+    'Electronics',
+    'Perishables',
+    'Documents',
+    'Fragile',
+    'Others',
+  ];
 
   // Mock Flights
   final List<String> _flights = [
@@ -205,6 +225,31 @@ class _ParcelWizardScreenState extends State<ParcelWizardScreen> {
           ),
         ),
         const SizedBox(height: 16),
+        const SizedBox(height: 16),
+        // Commodity Dropdown
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: Colors.white10,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white24),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _commodityType,
+              isExpanded: true,
+              dropdownColor: AppTheme.maryBlack,
+              style: const TextStyle(color: Colors.white),
+              items: _commodityTypes.map((type) {
+                return DropdownMenuItem(value: type, child: Text(type));
+              }).toList(),
+              onChanged: (val) {
+                if (val != null) setState(() => _commodityType = val);
+              },
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
         CustomTextField(
           label: 'Description',
           hint: 'What is inside?',
@@ -215,10 +260,15 @@ class _ParcelWizardScreenState extends State<ParcelWizardScreen> {
           children: [
             Expanded(
               child: CustomTextField(
-                label: 'Weight (kg)',
+                label: 'Weight (kg) *',
                 hint: '0.0',
                 keyboardType: TextInputType.number,
                 controller: _weightCtrl,
+                validator: (val) {
+                  if (val == null || val.isEmpty) return 'Required';
+                  if (double.tryParse(val) == null) return 'Invalid';
+                  return null;
+                },
                 onChanged: (val) => setState(() {}),
               ),
             ),
@@ -234,52 +284,86 @@ class _ParcelWizardScreenState extends State<ParcelWizardScreen> {
         ),
         const SizedBox(height: 24),
 
-        // Photo Capture Mock
+        // Photo Capture
         const Text('Parcel Photo', style: TextStyle(color: Colors.white70)),
         const SizedBox(height: 8),
-        InkWell(
-          onTap: () {
-            // Mock taking a photo
-            setState(() {
-              // Creating a 1x1 dummy blue pixel
-              _parcelPhoto = Uint8List.fromList(
-                List.filled(1000, 100),
-              ); // Just noise
-            });
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(const SnackBar(content: Text('Photo captured!')));
-          },
-          child: DashedContainer(
-            color: Colors.white24,
-            dashLength: 5,
-            gapLength: 5,
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              height: 150,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.white10,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: _parcelPhoto == null
-                  ? const Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.camera_alt, color: Colors.white54, size: 40),
-                        SizedBox(height: 8),
-                        Text(
-                          'Tap to Capture',
-                          style: TextStyle(color: Colors.white54),
-                        ),
-                      ],
-                    )
-                  : ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.memory(_parcelPhoto!, fit: BoxFit.cover),
-                    ),
+
+        // Photo preview or placeholder
+        DashedContainer(
+          color: Colors.white24,
+          dashLength: 5,
+          gapLength: 5,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            height: 150,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.white10,
+              borderRadius: BorderRadius.circular(12),
             ),
+            child: _parcelPhoto == null
+                ? const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.add_photo_alternate,
+                        color: Colors.white54,
+                        size: 40,
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Add Photo',
+                        style: TextStyle(color: Colors.white54),
+                      ),
+                    ],
+                  )
+                : ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.memory(_parcelPhoto!, fit: BoxFit.cover),
+                  ),
           ),
+        ),
+        const SizedBox(height: 12),
+
+        // Camera and Gallery buttons
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _pickImage(ImageSource.camera),
+                icon: const Icon(
+                  Icons.camera_alt,
+                  color: AppTheme.maryOrangeRed,
+                ),
+                label: const Text(
+                  'Take Photo',
+                  style: TextStyle(color: Colors.white),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppTheme.maryOrangeRed),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _pickImage(ImageSource.gallery),
+                icon: const Icon(
+                  Icons.photo_library,
+                  color: AppTheme.maryOrangeRed,
+                ),
+                label: const Text(
+                  'From Gallery',
+                  style: TextStyle(color: Colors.white),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppTheme.maryOrangeRed),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -290,7 +374,7 @@ class _ParcelWizardScreenState extends State<ParcelWizardScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Assign Flight',
+          'Route Selection',
           style: TextStyle(
             color: Colors.white,
             fontSize: 18,
@@ -298,6 +382,68 @@ class _ParcelWizardScreenState extends State<ParcelWizardScreen> {
           ),
         ),
         const SizedBox(height: 16),
+
+        // Origin
+        _buildDropdown(
+          label: 'Origin Country',
+          value: _originCountry,
+          items: airportsByCountry.keys.toList(),
+          onChanged: (val) => setState(() {
+            _originCountry = val;
+            _originAirportCode = null; // Reset airport
+          }),
+        ),
+        if (_originCountry != null) ...[
+          const SizedBox(height: 12),
+          _buildDropdown(
+            label: 'Origin Airport',
+            value: _originAirportCode,
+            items: airportsByCountry[_originCountry]!
+                .map((a) => a.code)
+                .toList(),
+            onChanged: (val) => setState(() => _originAirportCode = val),
+            displayMap: {
+              for (var a in airportsByCountry[_originCountry!]!)
+                a.code: '${a.code} - ${a.name}',
+            },
+          ),
+        ],
+
+        const SizedBox(height: 24),
+
+        // Destination
+        _buildDropdown(
+          label: 'Destination Country',
+          value: _destCountry,
+          items: airportsByCountry.keys.toList(),
+          onChanged: (val) => setState(() {
+            _destCountry = val;
+            _destAirportCode = null;
+          }),
+        ),
+        if (_destCountry != null) ...[
+          const SizedBox(height: 12),
+          _buildDropdown(
+            label: 'Destination Airport',
+            value: _destAirportCode,
+            items: airportsByCountry[_destCountry]!.map((a) => a.code).toList(),
+            onChanged: (val) => setState(() => _destAirportCode = val),
+            displayMap: {
+              for (var a in airportsByCountry[_destCountry!]!)
+                a.code: '${a.code} - ${a.name}',
+            },
+          ),
+        ],
+
+        const SizedBox(height: 24),
+        const Divider(color: Colors.grey),
+        const SizedBox(height: 16),
+
+        const Text(
+          'Flight (Optional)',
+          style: TextStyle(color: Colors.white70),
+        ),
+        const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
@@ -308,7 +454,7 @@ class _ParcelWizardScreenState extends State<ParcelWizardScreen> {
             child: DropdownButton<String>(
               value: _selectedFlight,
               hint: const Text(
-                'Select Flight',
+                'Auto-Assign / Select Flight',
                 style: TextStyle(color: Colors.white54),
               ),
               dropdownColor: AppTheme.maryBlack,
@@ -447,11 +593,67 @@ class _ParcelWizardScreenState extends State<ParcelWizardScreen> {
     );
   }
 
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: source,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        final bytes = await image.readAsBytes();
+        setState(() {
+          _parcelPhoto = bytes;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                source == ImageSource.camera
+                    ? 'Photo captured!'
+                    : 'Photo selected from gallery!',
+              ),
+              backgroundColor: AppTheme.maryOrangeRed,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error picking image: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   double _calculateCost() {
-    final weight = double.tryParse(_weightCtrl.text) ?? 0;
-    final basePrice = 2500.0; // Base KES
-    final perKg = 850.0; // Per KG KES
-    return basePrice + (weight * perKg);
+    double weight = double.tryParse(_weightCtrl.text) ?? 0.0;
+    double baseRate = 20.0;
+    double weightRate = weight * 15.0; // $15/kg
+
+    // Commodity Surcharge
+    double surcharge = 1.0;
+    if (_commodityType == 'Electronics') surcharge = 1.2;
+    if (_commodityType == 'Perishables') surcharge = 1.3;
+    if (_commodityType == 'Fragile') surcharge = 1.25;
+
+    // Route Factor (Simplified)
+    double distanceFactor = 1.0;
+    if (_originCountry != null &&
+        _destCountry != null &&
+        _originCountry != _destCountry) {
+      distanceFactor = 1.5; // International
+    }
+
+    return (baseRate + weightRate) * surcharge * distanceFactor;
   }
 
   Parcel _createParcel() {
@@ -464,12 +666,62 @@ class _ParcelWizardScreenState extends State<ParcelWizardScreen> {
       description: _descCtrl.text,
       weightKg: double.tryParse(_weightCtrl.text) ?? 0.0,
       dimensions: _dimsCtrl.text,
+      commodityType: _commodityType,
       photoBytes: _parcelPhoto,
-      flightNumber: _selectedFlight?.split(' ')[0] ?? 'MA000',
+      flightNumber: _selectedFlight?.split(' ')[0] ?? 'PENDING',
       departureDate: _flightDate,
-      origin: _selectedFlight?.contains('NBO') == true ? 'NBO' : 'DXB',
-      destination: _selectedFlight?.contains('DXB') == true ? 'DXB' : 'JFK',
+      origin: _originAirportCode ?? 'N/A',
+      destination: _destAirportCode ?? 'N/A',
       cost: _calculateCost(),
+    );
+  }
+
+  Widget _buildDropdown({
+    required String label,
+    required String? value,
+    required List<String> items,
+    required Function(String?) onChanged,
+    Map<String, String>? displayMap,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(color: Colors.white70, fontSize: 12),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: Colors.white10,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white24),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: value,
+              hint: Text(
+                'Select $label',
+                style: const TextStyle(color: Colors.white54),
+              ),
+              dropdownColor: AppTheme.maryBlack,
+              isExpanded: true,
+              style: const TextStyle(color: Colors.white),
+              items: items.map((item) {
+                return DropdownMenuItem(
+                  value: item,
+                  child: Text(
+                    displayMap != null ? (displayMap[item] ?? item) : item,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                );
+              }).toList(),
+              onChanged: onChanged,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
